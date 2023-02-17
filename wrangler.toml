@@ -1,3 +1,7 @@
 name = "cf-chatgptelegram"
 main = "src/index.ts"
 compatibility_date = "2023-02-17"
+
+[vars]
+
+# SECERT: TG_TOKEN
