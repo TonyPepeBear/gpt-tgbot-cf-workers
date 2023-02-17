@@ -1,3 +1,4 @@
+import { Update } from "@grammyjs/types";
 export interface Env {
   MY_KV_NAMESPACE: KVNamespace;
 }
@@ -9,16 +10,17 @@ export default {
     ctx: ExecutionContext
   ): Promise<Response> {
     const tg_token = "123"; // env.MY_KV_NAMESPACE.get("tg_token");
-
     // parse url
     const url = new URL(request.url);
 
     // telegram webhook
     if (request.method === "POST" && url.pathname === `/bot${tg_token}`) {
-      return new Response("Hello world!");
+      let update: Update = JSON.parse(await request.text());
+      return new Response(update.message?.chat.id! + update.message?.text!);
     }
-
     // ignore other requests
-    return new Response("404 - I am a telegram bot with webhook.", { status: 404 });
+    return new Response("404 - I am a telegram bot with webhook.", {
+      status: 404,
+    });
   },
 };
