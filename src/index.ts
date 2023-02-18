@@ -1,5 +1,6 @@
 import { Update, Message, ApiSuccess } from "@grammyjs/types";
 export interface Env {
+  CHAT_LIST: KVNamespace;
   TG_TOKEN: string;
   OPENAI_TOKEN: string;
 }
@@ -15,26 +16,63 @@ export default {
 
     // telegram webhook
     if (request.method === "POST" && url.pathname === `/bot${env.TG_TOKEN}`) {
+      // parse telegram update
       let update: Update = JSON.parse(await request.text());
-      console.log(update.message?.text);
+
+      // clear chat history
+      if (update.message?.text === "/clear") {
+        // clear chat history in KV
+        await env.CHAT_LIST.delete(update.message?.chat.id.toString()!);
+        // sent message to user that chat history cleared
+        const j = fetch(createSentMessageUrl(env.TG_TOKEN), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            chat_id: update.message?.chat.id!,
+            text: "Chat history cleared.",
+          }),
+        });
+        ctx.waitUntil(j);
+        return new Response();
+      }
+
+      // sent processing message
       const jobProcressing = fetch(createSentMessageUrl(env.TG_TOKEN), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          chat_id: update.message?.chat.id,
+          chat_id: update.message?.chat.id!,
           text: "processing...",
         }),
       });
 
+      // get chat history
+      const chatHistory = await env.CHAT_LIST.get(
+        update.message?.chat.id.toString()!
+      );
+      var askMessage = update.message?.text! + "\n\n";
+      // not null or empty
+      if (chatHistory) {
+        askMessage = chatHistory + update.message?.text! + "\n\n";
+      }
+
       // ask chatGPT
-      const jobGetResult = askGPT(update.message?.text!, env);
+      const jobGetResult = askGPT(askMessage, env);
 
       const jobEdit = async () => {
         console.log("edit message");
         const jobs = await Promise.all([jobProcressing, jobGetResult]);
         const result: ApiSuccess<Message> = JSON.parse(await jobs[0].text());
+
+        // save chat history
+        await env.CHAT_LIST.put(
+          update.message?.chat.id.toString()!,
+          askMessage + jobs[1] + "\n\n"
+        );
 
         //edit message
         await fetch(createEditMessageUrl(env.TG_TOKEN), {

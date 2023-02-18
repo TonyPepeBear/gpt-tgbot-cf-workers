@@ -1,6 +1,7 @@
 name = "cf-chatgptelegram"
 main = "src/index.ts"
 compatibility_date = "2023-02-17"
+kv_namespaces = [{ binding = "CHAT_LIST", id = "15d53f8eb18644e3b8dbff6714b78787" }]
 
 [vars]
 
