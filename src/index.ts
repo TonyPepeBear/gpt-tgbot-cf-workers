@@ -19,6 +19,23 @@ export default {
       // parse telegram update
       let update: Update = JSON.parse(await request.text());
 
+      // reply to /start command
+      if (update.message?.text === "/start") {
+        // sent message to user
+        const j = fetch(createSentMessageUrl(env.TG_TOKEN), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            chat_id: update.message?.chat.id!,
+            text: 'Hello, I am a robot, the name is "rabbitGPT". \nUse "/clear" to clear chat history that you have talked to me.',
+          }),
+        });
+        ctx.waitUntil(j);
+        return new Response();
+      }
+
       // clear chat history
       if (update.message?.text === "/clear") {
         // clear chat history in KV
@@ -46,7 +63,7 @@ export default {
         },
         body: JSON.stringify({
           chat_id: update.message?.chat.id!,
-          text: "processing...",
+          text: "Loading...💭",
         }),
       });
 
@@ -54,10 +71,18 @@ export default {
       const chatHistory = await env.CHAT_LIST.get(
         update.message?.chat.id.toString()!
       );
-      var askMessage = update.message?.text! + "\n\n";
+      var askMessage =
+        'I am a robot, the name is "rabbitGPT", is now talking to the user.\n\nuser says: \n' +
+        update.message?.text! +
+        "\n\nI says: \n";
       // not null or empty
       if (chatHistory) {
-        askMessage = chatHistory + update.message?.text! + "\n\n";
+        // askMessage = chatHistory + update.message?.text! + "\n\n";
+        askMessage =
+          chatHistory +
+          "\n\nuser says: \n" +
+          update.message?.text! +
+          "I says: \n";
       }
 
       // ask chatGPT
