@@ -5,6 +5,6 @@ kv_namespaces = [{ binding = "CHAT_KV", id = "15d53f8eb18644e3b8dbff6714b78787" 
 
 [vars]
 
-CHAT_LANGUAGE = "Taiwan Chinese"
+CHAT_LANGUAGE = "Traditional Chinese"
 
 # SECERT: TG_TOKEN
