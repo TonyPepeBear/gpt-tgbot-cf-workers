@@ -15,7 +15,6 @@ A Telegram bot using OpenAi API and Cloudflare Workers to chat with users.
 
 Create a Telegram bot using [@BotFather](https://t.me/BotFather) and get the bot token.
 
-
 ### 2. Clone this repo
 
 ```bash
@@ -56,3 +55,11 @@ https://api.telegram.org/<TG_TOKEN>/setWebhook?url=https://<your-workers-url>/bo
 ```
 
 ### 7. Enjoy
+
+## White List
+
+If you want to use white list, add `white_list` in your KV namespace. The value is a JSON array of user id like this:
+
+```json
+[123456789, 987654321]
+```
