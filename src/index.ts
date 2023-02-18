@@ -1,6 +1,7 @@
 import { Update, Message, ApiSuccess } from "@grammyjs/types";
 export interface Env {
   TG_TOKEN: string;
+  OPENAI_TOKEN: string;
 }
 
 export default {
@@ -26,14 +27,15 @@ export default {
           text: "processing...",
         }),
       });
-      const jobGetResult = doSomething();
-      
-      const jobEdit = (async () => {
+
+      // ask chatGPT
+      const jobGetResult = askGPT(update.message?.text!, env);
+
+      const jobEdit = async () => {
         console.log("edit message");
         const jobs = await Promise.all([jobProcressing, jobGetResult]);
-        const result : ApiSuccess<Message> = JSON.parse(await jobs[0].text());
-        console.log(result);
-        
+        const result: ApiSuccess<Message> = JSON.parse(await jobs[0].text());
+
         //edit message
         await fetch(createEditMessageUrl(env.TG_TOKEN), {
           method: "POST",
@@ -46,7 +48,7 @@ export default {
             text: jobs[1],
           }),
         });
-      })
+      };
 
       ctx.waitUntil(jobProcressing);
       ctx.waitUntil(jobGetResult);
@@ -63,10 +65,30 @@ export default {
   },
 };
 
-const doSomething = async () => {
-  //delay 5sec
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-  return "done";
+const askGPT = async (msg: string, env: Env) => {
+  const options = {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.OPENAI_TOKEN}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "text-davinci-003",
+      prompt: msg + "\n",
+      temperature: 0.7,
+      max_tokens: 256,
+      top_p: 1,
+      frequency_penalty: 0,
+      presence_penalty: 0,
+    }),
+  };
+
+  const resp_text = await (
+    await fetch("https://api.openai.com/v1/completions", options)
+  ).text();
+  const openai: OpenAIResponse = JSON.parse(resp_text);
+
+  return openai.choices[0].text;
 };
 
 // create sentMessage url
@@ -76,3 +98,24 @@ const createSentMessageUrl = (token: string) =>
 // create editMessage url
 const createEditMessageUrl = (token: string) =>
   `https://api.telegram.org/bot${token}/editMessageText`;
+
+interface OpenAIResponse {
+  id: string;
+  object: string;
+  created: number;
+  model: string;
+  choices: OpenAiChoice[];
+  usage: OpenAiUsage;
+}
+interface OpenAiChoice {
+  text: string;
+  index: number;
+  logprobs: null;
+  finish_reason: string;
+}
+
+interface OpenAiUsage {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+}
