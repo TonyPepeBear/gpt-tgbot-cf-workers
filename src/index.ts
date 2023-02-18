@@ -3,6 +3,7 @@ export interface Env {
   CHAT_KV: KVNamespace;
   TG_TOKEN: string;
   OPENAI_TOKEN: string;
+  CHAT_LANGUAGE: string;
 }
 
 export default {
@@ -84,17 +85,18 @@ export default {
         update.message?.chat.id.toString()!
       );
       var askMessage =
-        'I am a robot, the name is "rabbitGPT", is now talking to the user.\n\nuser says: \n' +
+        botSelfInfo(env.CHAT_LANGUAGE) +
+        "\n\nUser says: \n" +
         update.message?.text! +
-        "\n\nI says: \n";
+        "\n\nBot says: \n";
       // not null or empty
       if (chatHistory) {
         // askMessage = chatHistory + update.message?.text! + "\n\n";
         askMessage =
           chatHistory +
-          "\n\nuser says: \n" +
+          "\n\nUser says: \n" +
           update.message?.text! +
-          "I says: \n";
+          "\n\nBot says: \n";
       }
 
       // ask chatGPT
@@ -108,7 +110,7 @@ export default {
         // save chat history
         await env.CHAT_KV.put(
           update.message?.chat.id.toString()!,
-          askMessage + jobs[1] + "\n\n"
+          askMessage + jobs[1] + "\n"
         );
 
         //edit message
@@ -212,3 +214,16 @@ interface OpenAiUsage {
   completion_tokens: number;
   total_tokens: number;
 }
+
+// const botSelfInfo = (language: string) => `
+// I am a robot, the name is "rabbitGPT", is now talking to the user.
+// I speak ${language} by default, but will change according to user requests or responses.
+// I will also remind the user to use the "/clear" command once in every five replies to clear the log to avoid overuse.
+// `;
+
+const botSelfInfo = (language: string) => `
+There is a robot and a user talking to each other.
+The name of the robot is "rabbitGPT".
+By default, the robot speaks ${language}, but it will change this as the user requests or replies.
+The robot will also remind the user to use the "/clear" command once in every five replies to clear the log to avoid overuse.
+`;
