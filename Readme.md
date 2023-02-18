@@ -30,7 +30,7 @@ wrangler kv:namespace create "CHAT_LIST"
 
 ```toml
 kv-namespaces = [
-    { binding = "CHAT_LIST", id = "<your KV namespace id>" }
+    { binding = "CHAT", id = "<your KV namespace id>" }
 ]
 ```
 

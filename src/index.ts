@@ -1,6 +1,6 @@
 import { Update, Message, ApiSuccess } from "@grammyjs/types";
 export interface Env {
-  CHAT_LIST: KVNamespace;
+  CHAT_KV: KVNamespace;
   TG_TOKEN: string;
   OPENAI_TOKEN: string;
 }
@@ -19,27 +19,39 @@ export default {
       // parse telegram update
       let update: Update = JSON.parse(await request.text());
 
+      //white list
+      const whiteList: Array<string> =
+        (await env.CHAT_KV.get("white_list", "json")) || [];
+      if (
+        whiteList.length > 0 &&
+        !whiteList.includes(update.message?.chat.id.toString()!)
+      ) {
+        // if not in white list, sent message to user
+        sentMessage(
+          env.TG_TOKEN,
+          update.message?.chat.id!,
+          "You are not in the white list, please contact the administrator to add you to the white list." +
+            "\n" +
+            "Your chat id is: " +
+            update.message?.chat.id!
+        );
+        return new Response(); // early return
+      }
+
       // reply to /start command
       if (update.message?.text === "/start") {
-        // sent message to user
-        const j = fetch(createSentMessageUrl(env.TG_TOKEN), {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            chat_id: update.message?.chat.id!,
-            text: 'Hello, I am a robot, the name is "rabbitGPT". \nUse "/clear" to clear chat history that you have talked to me.',
-          }),
-        });
-        ctx.waitUntil(j);
-        return new Response();
+        sentMessage(
+          env.TG_TOKEN,
+          update.message?.chat.id!,
+          'Hello, I am a robot, the name is "rabbitGPT". \nUse "/clear" to clear chat history that you have talked to me.'
+        );
+        return new Response(); // early return
       }
 
       // clear chat history
       if (update.message?.text === "/clear") {
         // clear chat history in KV
-        await env.CHAT_LIST.delete(update.message?.chat.id.toString()!);
+        await env.CHAT_KV.delete(update.message?.chat.id.toString()!);
         // sent message to user that chat history cleared
         const j = fetch(createSentMessageUrl(env.TG_TOKEN), {
           method: "POST",
@@ -68,7 +80,7 @@ export default {
       });
 
       // get chat history
-      const chatHistory = await env.CHAT_LIST.get(
+      const chatHistory = await env.CHAT_KV.get(
         update.message?.chat.id.toString()!
       );
       var askMessage =
@@ -94,7 +106,7 @@ export default {
         const result: ApiSuccess<Message> = JSON.parse(await jobs[0].text());
 
         // save chat history
-        await env.CHAT_LIST.put(
+        await env.CHAT_KV.put(
           update.message?.chat.id.toString()!,
           askMessage + jobs[1] + "\n\n"
         );
@@ -126,6 +138,24 @@ export default {
       }
     );
   },
+};
+
+const sentMessage = async (token: string, chat_id: number, text: string) => {
+  const options = {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      chat_id: chat_id,
+      text: text,
+    }),
+  };
+  const resp_text = await (
+    await fetch(createSentMessageUrl(token), options)
+  ).text();
+  const resp: ApiSuccess<Message> = JSON.parse(resp_text);
+  return resp;
 };
 
 const askGPT = async (msg: string, env: Env) => {
