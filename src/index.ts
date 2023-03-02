@@ -81,36 +81,36 @@ export default {
       });
 
       // get chat history
-      const chatHistory = await env.CHAT_KV.get(
-        update.message?.chat.id.toString()!
-      );
-      var askMessage =
-        botSelfInfo(env.CHAT_LANGUAGE) +
-        "\n\nUser says: \n" +
-        update.message?.text! +
-        "\n\nBot says: \n";
-      // not null or empty
+      const chatHistory = (await env.CHAT_KV.get(
+        update.message?.chat.id.toString()!,
+        { type: "json" }
+      )) as Array<ChatGptMessage> | undefined;
+
+      var askMessage: Array<ChatGptMessage> = [
+        { role: "system", content: botSelfInfo(env.CHAT_LANGUAGE) },
+      ];
       if (chatHistory) {
-        // askMessage = chatHistory + update.message?.text! + "\n\n";
-        askMessage =
-          chatHistory +
-          "\n\nUser says: \n" +
-          update.message?.text! +
-          "\n\nBot says: \n";
+        for (const msg of chatHistory!) {
+          askMessage.push(msg);
+        }
       }
+      askMessage.push({ role: "user", content: update.message?.text! });
 
       // ask chatGPT
       const jobGetResult = askGPT(askMessage, env);
 
       const jobEdit = async () => {
-        console.log("edit message");
         const jobs = await Promise.all([jobProcressing, jobGetResult]);
         const result: ApiSuccess<Message> = JSON.parse(await jobs[0].text());
 
         // save chat history
+        // chatHistory.push({ role: "assistant", content: jobs[1] });
+        const saveHistory: Array<ChatGptMessage> = chatHistory || [];
+        saveHistory.push({ role: "user", content: update.message?.text! });
+        saveHistory.push(jobs[1].message);
         await env.CHAT_KV.put(
           update.message?.chat.id.toString()!,
-          askMessage + jobs[1] + "\n"
+          JSON.stringify(saveHistory)
         );
 
         //edit message
@@ -122,7 +122,7 @@ export default {
           body: JSON.stringify({
             chat_id: result.result.chat.id,
             message_id: result.result.message_id,
-            text: jobs[1],
+            text: jobs[1].message.content,
           }),
         });
       };
@@ -160,7 +160,7 @@ const sentMessage = async (token: string, chat_id: number, text: string) => {
   return resp;
 };
 
-const askGPT = async (msg: string, env: Env) => {
+const askGPT = async (msg: Array<ChatGptMessage>, env: Env) => {
   const options = {
     method: "POST",
     headers: {
@@ -168,23 +168,22 @@ const askGPT = async (msg: string, env: Env) => {
       "content-type": "application/json",
     },
     body: JSON.stringify({
-      model: "text-davinci-003",
-      prompt: msg + "\n",
-      temperature: 0.7,
-      max_tokens: 300,
-      top_p: 1,
-      frequency_penalty: 0,
-      presence_penalty: 0,
+      model: "gpt-3.5-turbo",
+      messages: msg,
     }),
   };
 
   const resp_text = await (
-    await fetch("https://api.openai.com/v1/completions", options)
+    await fetch("https://api.openai.com/v1/chat/completions", options)
   ).text();
   const openai: OpenAIResponse = JSON.parse(resp_text);
-
-  return openai.choices[0].text;
+  return openai.choices[0];
 };
+
+interface ChatGptMessage {
+  role: string;
+  content: string;
+}
 
 // create sentMessage url
 const createSentMessageUrl = (token: string) =>
@@ -203,10 +202,9 @@ interface OpenAIResponse {
   usage: OpenAiUsage;
 }
 interface OpenAiChoice {
-  text: string;
-  index: number;
-  logprobs: null;
+  message: ChatGptMessage;
   finish_reason: string;
+  index: number;
 }
 
 interface OpenAiUsage {
@@ -215,15 +213,7 @@ interface OpenAiUsage {
   total_tokens: number;
 }
 
-// const botSelfInfo = (language: string) => `
-// I am a robot, the name is "rabbitGPT", is now talking to the user.
-// I speak ${language} by default, but will change according to user requests or responses.
-// I will also remind the user to use the "/clear" command once in every five replies to clear the log to avoid overuse.
-// `;
-
 const botSelfInfo = (language: string) => `
-There is a robot and a user talking to each other.
-The name of the robot is "rabbitGPT".
-By default, the robot speaks ${language}, but it will change this as the user requests or replies.
-The robot will also remind the user to use the "/clear" command once in every five replies to clear the log to avoid overuse.
+You are a helpful assistant named "rabbitGPT". 
+By default, you speak ${language}, but you will speak the appropriate language based on the user's request or response.
 `;
